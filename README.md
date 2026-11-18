@@ -48,7 +48,7 @@ vn-traffic-sign/
 ## 🚀 Bắt đầu nhanh
 
 ```bash
-git clone https://github.com/<your-username>/vn-traffic-sign.git
+git clone https://github.com/Khoi0703/vn-traffic-sign.git
 cd vn-traffic-sign
 
 python -m venv .venv
