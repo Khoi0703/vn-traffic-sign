@@ -3,7 +3,6 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Ultralytics](https://img.shields.io/badge/Ultralytics-YOLO11-00BFFF.svg)](https://docs.ultralytics.com/models/yolo11/)
 [![Streamlit](https://img.shields.io/badge/Demo-Streamlit-FF4B4B.svg)](https://streamlit.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Hệ thống phát hiện và phân loại **52 loại biển báo giao thông Việt Nam** từ ảnh, video và webcam, dựa trên **YOLO11n** (chỉ 2.6M tham số). Project đi trọn một vòng khép kín: chuẩn bị dữ liệu **chống rò rỉ** → huấn luyện → đánh giá chi tiết theo từng lớp → export ONNX/OpenVINO → suy luận video có **tracking** → web demo.
 
@@ -215,11 +214,8 @@ Chi tiết đầy đủ nằm trong `reports/per_class_test.csv` (sinh bởi `vn
 
 ---
 
-## 🙏 Ghi nhận
+## Ghi nhận
 
 - Dữ liệu: [maitam/vietnamese-traffic-signs](https://www.kaggle.com/datasets/maitam/vietnamese-traffic-signs) trên Kaggle. Vui lòng xem trang dataset để biết điều khoản sử dụng và trích dẫn tác giả.
 - Mô hình và công cụ: [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics), [ByteTrack](https://github.com/ifzhang/ByteTrack), [OpenVINO](https://docs.openvino.ai/), [Streamlit](https://streamlit.io/).
 
-## 📄 Giấy phép
-
-Mã nguồn được phát hành theo giấy phép **MIT** (xem [LICENSE](LICENSE)). Dữ liệu huấn luyện thuộc về tác giả gốc và tuân theo giấy phép của họ trên Kaggle. Lưu ý rằng Ultralytics YOLO được phân phối theo giấy phép AGPL-3.0, hãy kiểm tra điều khoản này nếu bạn định dùng cho mục đích thương mại.
