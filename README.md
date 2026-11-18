@@ -1,129 +1,225 @@
-# 📊 Báo cáo Thống kê & Đánh giá Mô hình: Nhận diện Biển báo Giao thông Việt Nam (YOLO11)
+# 🚦 Nhận diện Biển báo Giao thông Việt Nam với YOLO11
 
-Tài liệu tổng hợp toàn bộ số liệu thực nghiệm, thống kê hiệu suất mô hình, phân phối độ chính xác trên 52 lớp biển báo giao thông Việt Nam (`maitam/vietnamese-traffic-signs`) và benchmark phần cứng.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Ultralytics](https://img.shields.io/badge/Ultralytics-YOLO11-00BFFF.svg)](https://docs.ultralytics.com/models/yolo11/)
+[![Streamlit](https://img.shields.io/badge/Demo-Streamlit-FF4B4B.svg)](https://streamlit.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
----
+Hệ thống phát hiện và phân loại **52 loại biển báo giao thông Việt Nam** từ ảnh, video và webcam, dựa trên **YOLO11n** (chỉ 2.6M tham số). Project đi trọn một vòng khép kín: chuẩn bị dữ liệu **chống rò rỉ** → huấn luyện → đánh giá chi tiết theo từng lớp → export ONNX/OpenVINO → suy luận video có **tracking** → web demo.
 
-## 1. Tổng quan Cấu hình & Dữ liệu Thực nghiệm
+<p align="center">
+  <img src="docs/assets/sample_predictions.jpg" alt="Kết quả dự đoán mẫu trên tập test" width="90%">
+  <br><em>Dự đoán trên ảnh dashcam thuộc tập test (mưa, nhiều xe máy, biển nhỏ ở xa).</em>
+</p>
 
-| Hạng mục | Thông số thống kê |
+## ✨ Điểm nhấn
+
+| | |
 | :--- | :--- |
-| **Kiến trúc mô hình** | `YOLO11n` (101 layers, `2,609,444` tham số, `6.5 GFLOPs` @ 640 / `14.8 GFLOPs` @ 960) |
-| **Số lượng lớp (Classes)** | `52` loại biển báo giao thông Việt Nam |
-| **Tập Validation** | `324` ảnh \| `852` đối tượng (trung bình `2.63` biển/ảnh) |
-| **Tập Test (Độc lập)** | `320` ảnh \| `823` đối tượng (trung bình `2.57` biển/ảnh, `46/52` lớp xuất hiện) |
-| **Chống rò rỉ dữ liệu** | Gom nhóm cụm khung hình trùng lặp bằng `pHash` trước khi chia tập |
-| **Phần cứng huấn luyện** | NVIDIA GeForce RTX 3050 Laptop GPU (4GB VRAM) — `40 epochs` trong `0.758 giờ` (~45.5 phút) |
-| **Phần cứng đo CPU** | AMD Ryzen 5 7535HS with Radeon Graphics |
+| 🎯 **Độ chính xác** | **mAP@50 = 0.982**, F1 = 0.94 trên tập test độc lập (320 ảnh, 823 biển) |
+| ⚡ **Tốc độ** | ~139 FPS trên GPU (RTX 3050 Laptop); 17.5 FPS trên CPU với OpenVINO ở 960×960 |
+| 🪶 **Nhẹ** | YOLO11n, 2.6M tham số, file `best.pt` ~5.5 MB |
+| 🧹 **Dữ liệu sạch** | Gom ảnh gần giống nhau (khung hình liên tiếp) bằng **pHash** *trước khi* chia train/val/test để tránh rò rỉ dữ liệu |
+| 🔁 **Tái lập được** | Toàn bộ tham số nằm ở `configs/default.yaml`, mỗi bước là một lệnh CLI, có unit test |
+| 🎬 **Video & Web** | Tracking ByteTrack (mỗi biển chỉ ghi 1 lần) + ứng dụng Streamlit |
 
 ---
 
-## 2. Thống kê Độ chính xác Tổng quát (Validation vs. Test)
+## 📁 Cấu trúc project
 
-| Tập dữ liệu | Images | Instances | Precision ($P$) | Recall ($R$) | F1-Score (Max) | mAP@50 | mAP@50-95 | GPU Inference | GPU FPS |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Validation** | 324 | 852 | 0.9360 | 0.8990 | — | 0.9750 | 0.7480 | 4.1 ms | ~243.9 |
-| **Test** | 320 | 823 | **0.9408** | **0.9538** | **0.94** (`@0.591`) | **0.9820** | **0.7569** | 7.2 ms | ~138.9 |
-| **Chênh lệch (Test - Val)** | -4 | -29 | `+0.0048` | `+0.0548` | — | `+0.0070` | `+0.0089` | +3.1 ms | -105.0 |
-
-### Các điểm ngưỡng thống kê trên tập Test (`reports/eval_test/`)
-* **Đỉnh F1-Score:** `0.94` tại ngưỡng tin cậy **`conf = 0.591`** (khuyến nghị dùng `conf = 0.50 – 0.60` khi suy luận).
-* **Đỉnh Precision:** `1.00` tại **`conf = 1.000`**.
-* **Đỉnh Recall:** `0.99` tại **`conf = 0.000`**.
-* **Diện tích dưới đường cong PR (mAP@50):** **`0.982`**.
-
-| Precision-Recall Curve | F1-Confidence Curve |
-| :---: | :---: |
-| ![PR Curve](reports/eval_test/BoxPR_curve.png) | ![F1 Curve](reports/eval_test/BoxF1_curve.png) |
-
-| Confusion Matrix (Số lượng tuyệt đối) | Confusion Matrix (Chuẩn hóa tỷ lệ) |
-| :---: | :---: |
-| ![Confusion Matrix](reports/eval_test/confusion_matrix.jpg) | ![Confusion Matrix Normalized](reports/eval_test/confusion_matrix_normalized.jpg) |
+```
+vn-traffic-sign/
+├── configs/default.yaml          # Cấu hình trung tâm (data / train / infer)
+├── src/vnsign/
+│   ├── config.py                 # Đọc config, chọn thiết bị (CUDA / MPS / CPU)
+│   ├── data/                     # EDA, lọc nhãn, chia tập chống rò rỉ (pHash)
+│   ├── train/train.py            # Huấn luyện
+│   ├── eval/evaluate.py          # Chỉ số tổng + AP từng lớp + confusion matrix
+│   ├── export/export.py          # Export ONNX / OpenVINO + benchmark CPU
+│   └── inference/predict.py      # Ảnh / thư mục / video / webcam + tracking
+├── app/streamlit_app.py          # Web demo
+├── tests/test_prepare.py         # Unit test cho bước chuẩn bị dữ liệu
+├── notebooks/                    # Notebook Kaggle gốc (tham khảo)
+└── docs/assets/                  # Ảnh dùng trong README
+```
 
 ---
 
-## 3. Phân phối Hiệu suất trên 46 Lớp Tập Test (`reports/per_class_test.csv`)
+## 🚀 Bắt đầu nhanh
 
-### 3.1. Thống kê mô tả theo chỉ số ( trên 46 lớp có mẫu ở tập Test)
-
-| Chỉ số | Trung bình (Mean) | Trung vị (Median) | Thấp nhất (Min) | Cao nhất (Max) | Số lớp đạt $\ge 0.95$ |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Precision** | 0.938 | 0.954 | 0.628 (`Low Clearance`) | 1.000 (10 lớp) | **27 / 46** (58.7%) |
-| **Recall** | 0.948 | 1.000 | 0.761 (`Speed limit 50km/h`) | 1.000 (28 lớp) | **31 / 46** (67.4%) |
-| **AP@50** | 0.980 | 0.995 | 0.880 (`Speed limit 50km/h`) | 0.995 (32 lớp) | **41 / 46** (89.1%) |
-| **AP@50-95** | 0.761 | 0.765 | 0.497 (`Equal-level Intersection`) | 0.904 (`No Left or Right Turn`) | — |
-
-### 3.2. Phân nhóm lớp theo mức độ chính xác (AP@50)
-
-| Phân nhóm hiệu suất | Ngưỡng AP@50 | Số lượng lớp | Tỷ lệ | Đại diện tiêu biểu |
-| :--- | :---: | :---: | :---: | :--- |
-| **Xuất sắc (Tier 1)** | $\ge 0.990$ | **35 lớp** | 76.1% | *No Left Turn (0.995), No Right Turn (0.995), No Stopping & No Parking (0.994), Height Limit (0.995)* |
-| **Tốt (Tier 2)** | $0.950 - 0.989$ | **6 lớp** | 13.0% | *Pedestrian Crossing (0.989), Right Turn Only (0.989), No Parking (0.981), Slow Down (0.974)* |
-| **Cần cải thiện (Tier 3)** | $< 0.950$ | **5 lớp** | 10.9% | *Lane Allocation (0.928), One-way street (0.913), No U-Turn & No Right Turn (0.913), No Trucks Allowed (0.880), Speed limit 50km/h (0.880)* |
-
-### 3.3. Bảng chi tiết Top 10 lớp cao nhất & Top 10 lớp thấp nhất (theo AP@50-95 & AP@50)
-
-**Top 10 lớp có độ chính xác định vị khung hình cao nhất (AP@50-95):**
-
-| Hạng | ID | Tên biển báo | Instances | Precision | Recall | AP@50 | AP@50-95 |
-| :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| 1 | `33` | No Left or Right Turn | 6 | 0.950 | 1.000 | 0.995 | **0.904** |
-| 2 | `15` | Narrow Road on the Right | 2 | 0.872 | 1.000 | 0.995 | **0.895** |
-| 3 | `32` | No Containers Allowed | 7 | 1.000 | 0.972 | 0.995 | **0.882** |
-| 4 | `34` | No Straight and Right Turn | 6 | 0.940 | 1.000 | 0.995 | **0.879** |
-| 5 | `17` | No U-Turn | 7 | 0.953 | 1.000 | 0.995 | **0.851** |
-| 6 | `23` | No Two or Three-wheeled Vehicles | 43 | 1.000 | 0.944 | 0.995 | **0.833** |
-| 7 | `30` | Road with Surveillance Camera | 9 | 0.976 | 1.000 | 0.995 | **0.830** |
-| 8 | `47` | No U-Turn for Cars | 3 | 0.974 | 1.000 | 0.995 | **0.830** |
-| 9 | `48` | Level Crossing with Barriers | 3 | 0.935 | 1.000 | 0.995 | **0.830** |
-| 10 | `9` | Roundabout | 4 | 0.921 | 1.000 | 0.995 | **0.829** |
-
-**Top 10 lớp có AP@50 thấp nhất (Nhóm ưu tiên bổ sung dữ liệu):**
-
-| Hạng | ID | Tên biển báo | Instances | Precision | Recall | AP@50 | AP@50-95 | Nguyên nhân chính từ Confusion Matrix |
-| :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| 1 | `38` | Speed limit (50km/h) | 7 | 1.000 | 0.761 | **0.880** | 0.600 | Bỏ sót biển nhỏ (`background`) & nhầm với *One-way street* |
-| 2 | `14` | No Trucks Allowed | 11 | 0.907 | 0.909 | **0.880** | 0.650 | Nhầm với *No Containers Allowed* |
-| 3 | `19` | No U-Turn and No Right Turn | 3 | 0.703 | 0.814 | **0.913** | 0.814 | Thiếu mẫu huấn luyện & kiểm thử (chỉ có 3 mẫu) |
-| 4 | `45` | One-way street | 20 | 0.941 | 0.799 | **0.913** | 0.708 | Bỏ sót (`background`: 20% false negative) |
-| 5 | `12` | Lane Allocation | 16 | 0.848 | 0.938 | **0.928** | 0.823 | Nhận diện nhầm từ nền (`background` false positive) |
-| 6 | `41` | Speed limit (40km/h) | 45 | 0.961 | 0.911 | **0.958** | 0.765 | Sót biển ở khoảng cách xa |
-| 7 | `39` | Speed limit (60km/h) | 40 | 0.994 | 0.950 | **0.972** | 0.791 | Sót một số mẫu kích thước nhỏ |
-| 8 | `13` | Slow Down | 36 | 0.912 | 0.972 | **0.974** | 0.761 | Lẫn nhẹ với nền phức tạp |
-| 9 | `46` | No Parking | 42 | 0.954 | 0.997 | **0.981** | 0.749 | Nhầm nhẹ với *No Stopping and No Parking* |
-| 10 | `6` | Danger zone on the left | 14 | 0.930 | 0.857 | **0.986** | 0.638 | Sót biển ở góc khuất/xa |
-
----
-
-## 4. Benchmark Tốc độ & Dung lượng Triển khai (`reports/benchmark.csv`)
-
-Đo lường thực tế trên 50 ảnh tập Test với CPU **AMD Ryzen 5 7535HS** (Input shape `1x3x960x960`):
-
-| Định dạng | Đường dẫn Artifact | Dung lượng | FPS (CPU) | Latency (ms/ảnh) | So với PyTorch | Khuyến nghị sử dụng |
-| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **OpenVINO** | `weights/best_openvino_model/` | 10.5 MB | **17.46** | **57.27 ms** | **`+10.2%` FPS** | Triển khai thực tế trên CPU Intel/AMD |
-| **PyTorch** | `weights/best.pt` | **5.5 MB** | 15.85 | 63.09 ms | Baseline (`1.0x`) | Huấn luyện & suy luận trên GPU CUDA |
-| **ONNX** | `weights/best.onnx` | 10.4 MB | 12.61 | 79.30 ms | `-20.4%` FPS | Tích hợp đa ngôn ngữ / C++ / Web |
-
----
-
-## 5. Cài đặt & Tái lập Kết quả (Reproducibility)
-
-### Cài đặt nhanh
 ```bash
+git clone https://github.com/<your-username>/vn-traffic-sign.git
+cd vn-traffic-sign
+
 python -m venv .venv
-.venv\Scripts\activate          # Windows (macOS/Linux: source .venv/bin/activate)
+.venv\Scripts\activate            # Windows  (macOS/Linux: source .venv/bin/activate)
 pip install -e ".[dev]"
-pytest -q
+pytest -q                         # kiểm tra môi trường
 ```
 
-### Các lệnh tái lập toàn bộ Pipeline & Báo cáo
+> **Weights:** file `*.pt` không được đưa vào repo. Hãy tự huấn luyện (~45 phút trên RTX 3050 Laptop) theo hướng dẫn bên dưới, hoặc truyền weights của bạn qua `--weights`.
+
+### Chạy toàn bộ pipeline
+
 ```bash
-vnsign-eda                                        # 1. Thống kê phân bố dữ liệu thô
-vnsign-prepare                                    # 2. Lọc nhãn & chia tập chống rò rỉ (pHash)
-vnsign-train --epochs 40 --name yolo11n_baseline  # 3. Huấn luyện mô hình
-vnsign-eval --split test                          # 4. Xuất per_class_test.csv & biểu đồ
-vnsign-export --formats onnx openvino             # 5. Export & xuất benchmark.csv
-vnsign-predict --source 0 --conf 0.59 --show      # 6. Suy luận webcam + ByteTrack
-streamlit run app/streamlit_app.py                # 7. Khởi chạy Web App
+vnsign-eda                                          # 1. Thống kê phân bố dữ liệu thô
+vnsign-prepare                                      # 2. Lọc nhãn lỗi + chia tập chống rò rỉ (pHash)
+vnsign-train --epochs 40 --name yolo11n_baseline    # 3. Huấn luyện
+vnsign-eval --split test                            # 4. Đánh giá → per_class_test.csv + biểu đồ
+vnsign-export --formats onnx openvino               # 5. Export + benchmark.csv
+vnsign-predict --source video.mp4 --conf 0.5        # 6. Suy luận video + tracking
+streamlit run app/streamlit_app.py                  # 7. Web demo
 ```
+
+Dữ liệu được tải tự động từ Kaggle qua `kagglehub`. Nếu đã có sẵn, đặt thư mục chứa `images/` và `labels/` vào `data/raw` (hoặc đổi `data.raw_dir` trong config).
+
+### Một số ví dụ sử dụng
+
+```bash
+# Webcam (nhấn q để thoát)
+vnsign-predict --source 0 --conf 0.55 --show
+
+# Thư mục ảnh, dùng weights riêng
+vnsign-predict --weights path/to/best.pt --source ./my_images --out ./out
+
+# Export OpenVINO INT8
+vnsign-export --formats openvino --int8
+```
+
+Với video và webcam, kết quả gồm `annotated.mp4` và `signs_log.csv` (mỗi biển một dòng: track ID, lớp, thời điểm xuất hiện đầu tiên, độ tin cậy cao nhất).
+
+---
+
+## 🗂️ Dữ liệu
+
+- **Nguồn:** [Vietnam Traffic Signs – Kaggle (`maitam/vietnamese-traffic-signs`)](https://www.kaggle.com/datasets/maitam/vietnamese-traffic-signs), định dạng nhãn YOLO, **52 lớp**.
+- **Ảnh dashcam** quay trên đường phố Việt Nam, gồm nhiều khung hình liên tiếp từ cùng một đoạn video.
+- **Cách chia:** 80% train / 10% valid / 10% test, `seed = 42`.
+
+| Tập | Ảnh | Biển (instances) | Ghi chú |
+| :--- | :---: | :---: | :--- |
+| Validation | 324 | 852 | ~2.63 biển/ảnh |
+| Test | 320 | 823 | ~2.57 biển/ảnh, **46/52 lớp** có mẫu |
+
+### Chống rò rỉ dữ liệu
+
+Vì dữ liệu gồm các khung hình liên tiếp, chia ảnh ngẫu nhiên sẽ khiến những khung gần như giống hệt nhau rơi vào cả train lẫn test và làm số liệu đẹp giả tạo. Bước `vnsign-prepare` xử lý như sau:
+
+1. Tính **perceptual hash (pHash)** cho từng ảnh.
+2. Gom các ảnh có khoảng cách Hamming ≤ 4 vào cùng một nhóm (`data.dedupe_hamming`).
+3. Chia **theo nhóm**, nên toàn bộ một nhóm luôn nằm chung một tập.
+4. Kiểm tra và loại các dòng nhãn không hợp lệ (sai lớp, toạ độ ngoài [0, 1], thiếu trường), ghi `split_report.json`.
+
+---
+
+## 🏋️ Huấn luyện
+
+| Tham số | Giá trị |
+| :--- | :--- |
+| Mô hình | `yolo11n.pt` (pretrained COCO) |
+| Kích thước ảnh | 960 × 960 |
+| Epochs / Patience | 40 / 15 |
+| Batch | 8 |
+| Optimizer LR | cosine (`cos_lr: true`) |
+| Phần cứng | NVIDIA RTX 3050 Laptop (4 GB VRAM), ~45.5 phút |
+
+**Augmentation (do Ultralytics xử lý khi train):** `mosaic = 1.0` (tắt ở 5 epoch cuối), `scale = 0.9`, `translate = 0.1`, `degrees = 5`, HSV (`0.015 / 0.7 / 0.4`).
+
+> ⚠️ **`fliplr = 0`:** lật ngang bị **tắt** có chủ đích vì sẽ đảo nghĩa các biển *cấm rẽ trái / rẽ phải*, *đường hẹp bên trái / phải*, *nguy hiểm bên trái / phải*.
+
+Chọn ảnh 960 thay vì 640 để cải thiện khả năng bắt **biển nhỏ ở xa** – tình huống phổ biến trong ảnh dashcam.
+
+---
+
+## 📈 Kết quả
+
+### Tổng quát
+
+| Tập | Precision | Recall | mAP@50 | mAP@50-95 | GPU latency | GPU FPS |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Validation | 0.936 | 0.899 | 0.975 | 0.748 | 4.1 ms | ~244 |
+| **Test** | **0.941** | **0.954** | **0.982** | **0.757** | 7.2 ms | ~139 |
+
+- Đỉnh **F1 = 0.94 tại `conf = 0.591`** → khuyến nghị dùng ngưỡng **0.50 – 0.60** khi suy luận.
+- Khoảng cách giữa mAP@50 (0.982) và mAP@50-95 (0.757) cho thấy mô hình **phát hiện tốt nhưng khung chưa thật khít** ở các ngưỡng IoU cao, hợp lý với biển rất nhỏ trong ảnh.
+
+<table>
+  <tr>
+    <td align="center"><b>Precision–Recall</b></td>
+    <td align="center"><b>F1 – Confidence</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/pr_curve.png" alt="PR curve"></td>
+    <td><img src="docs/assets/f1_curve.png" alt="F1 curve"></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/assets/confusion_matrix_normalized.png" alt="Confusion matrix (chuẩn hoá)" width="80%">
+  <br><em>Confusion matrix chuẩn hoá trên tập test: đường chéo rất đậm, lỗi chủ yếu là bỏ sót (<code>background</code>) chứ không phải nhầm giữa các lớp.</em>
+</p>
+
+### Theo từng lớp (46 lớp có mẫu trong tập test)
+
+Chi tiết đầy đủ nằm trong `reports/per_class_test.csv` (sinh bởi `vnsign-eval`).
+
+| Chỉ số | Trung bình | Trung vị | Thấp nhất | Số lớp ≥ 0.95 |
+| :--- | :---: | :---: | :--- | :---: |
+| Precision | 0.941 | 0.955 | 0.628 (*Low Clearance*, 4 mẫu) | 26 / 46 |
+| Recall | 0.954 | 1.000 | 0.761 (*Speed limit 50 km/h*) | 31 / 46 |
+| AP@50 | 0.982 | 0.995 | 0.880 (*Speed limit 50 km/h*, *No Trucks Allowed*) | 41 / 46 |
+| AP@50-95 | 0.757 | 0.760 | 0.497 (*Equal-level Intersection*, 2 mẫu) | — |
+
+**Phân nhóm theo AP@50:** 32 lớp ≥ 0.99 · 9 lớp từ 0.95 đến 0.99 · **5 lớp < 0.95**.
+
+#### Các lớp yếu nhất
+
+| Biển báo | Mẫu test | Precision | Recall | AP@50 | AP@50-95 | Quan sát |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| Speed limit (50 km/h) | 7 | 1.000 | 0.761 | 0.880 | 0.600 | Bỏ sót biển nhỏ; đôi lúc nhầm với *One-way street* |
+| No Trucks Allowed | 11 | 0.907 | 0.909 | 0.880 | 0.650 | Nhầm lẫn với *No Containers Allowed* |
+| No U-Turn and No Right Turn | 3 | 0.703 | 0.814 | 0.913 | 0.814 | Rất ít mẫu |
+| One-way street | 20 | 0.941 | 0.799 | 0.913 | 0.708 | ~20% bị bỏ sót (nhận là nền) |
+| Lane Allocation | 16 | 0.848 | 0.938 | 0.928 | 0.823 | Có dương tính giả từ nền |
+
+### Benchmark triển khai (CPU)
+
+Đo trên 50 ảnh test, đầu vào `1×3×960×960`, CPU **AMD Ryzen 5 7535HS**:
+
+| Định dạng | Dung lượng | FPS | Latency | So với PyTorch |
+| :--- | :---: | :---: | :---: | :---: |
+| **OpenVINO** | 10.5 MB | **17.46** | **57.3 ms** | +10% |
+| PyTorch (`.pt`) | **5.5 MB** | 15.85 | 63.1 ms | baseline |
+| ONNX | 10.4 MB | 12.61 | 79.3 ms | −20% |
+
+> Benchmark chạy trên tập nhỏ (50 ảnh), nên chênh lệch ~10% giữa OpenVINO và PyTorch chỉ mang tính tham khảo. Kết quả còn phụ thuộc phần cứng và phiên bản thư viện.
+
+---
+
+## ⚠️ Hạn chế
+
+Để đánh giá kết quả một cách trung thực:
+
+- **Tập test nhỏ và phân bố lệch.** 15/46 lớp chỉ có ≤ 5 mẫu trong test, nên AP@50 của các lớp đó (nhiều lớp đạt 0.995) **không có nhiều ý nghĩa thống kê**. 6/52 lớp không xuất hiện trong test nên chưa được kiểm chứng.
+- **Dữ liệu cùng miền.** Ảnh chủ yếu quay bằng dashcam trong cùng điều kiện (đô thị, trời mưa/âm u). Kết quả phản ánh khả năng trong miền này; khả năng tổng quát hoá sang ban đêm, nắng gắt, camera khác, tỉnh thành khác **chưa được kiểm chứng**.
+- **Chưa có khoảng tin cậy.** Mỗi cấu hình chỉ huấn luyện một lần (`seed = 42`), chưa chạy nhiều seed nên chênh lệch nhỏ giữa val và test nằm trong mức nhiễu.
+- **Biển nhỏ ở xa** vẫn là nguồn lỗi chính (bỏ sót), thể hiện qua recall thấp ở các biển tốc độ và *One-way street*.
+
+## 🛣️ Hướng phát triển
+
+- [ ] Thu thêm dữ liệu cho các lớp hiếm và các lớp chưa có trong test; chia tập theo **video/tuyến đường** để đánh giá tổng quát hoá chặt chẽ hơn.
+- [ ] So sánh `yolo11s/m` để cải thiện mAP@50-95; thử tăng độ phân giải hoặc tiling cho biển nhỏ.
+- [ ] Lượng tử hoá INT8 và đo độ giảm chính xác.
+- [ ] Triển khai trên thiết bị biên (Jetson / Raspberry Pi).
+- [ ] CI (GitHub Actions) chạy `ruff` + `pytest`.
+
+---
+
+## 🙏 Ghi nhận
+
+- Dữ liệu: [maitam/vietnamese-traffic-signs](https://www.kaggle.com/datasets/maitam/vietnamese-traffic-signs) trên Kaggle. Vui lòng xem trang dataset để biết điều khoản sử dụng và trích dẫn tác giả.
+- Mô hình và công cụ: [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics), [ByteTrack](https://github.com/ifzhang/ByteTrack), [OpenVINO](https://docs.openvino.ai/), [Streamlit](https://streamlit.io/).
+
+## 📄 Giấy phép
+
+Mã nguồn được phát hành theo giấy phép **MIT** (xem [LICENSE](LICENSE)). Dữ liệu huấn luyện thuộc về tác giả gốc và tuân theo giấy phép của họ trên Kaggle. Lưu ý rằng Ultralytics YOLO được phân phối theo giấy phép AGPL-3.0, hãy kiểm tra điều khoản này nếu bạn định dùng cho mục đích thương mại.
