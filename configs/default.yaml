@@ -1,0 +1,45 @@
+# Cấu hình trung tâm. Chỉnh ở đây thay vì sửa code.
+
+data:
+  kaggle_dataset: maitam/vietnamese-traffic-signs
+  # Nếu đã tải dữ liệu về máy, đặt thư mục chứa images/ và labels/ vào đây.
+  # Nếu không có, chương trình tự tải từ Kaggle (qua kagglehub).
+  raw_dir: data/raw
+  processed_dir: data/processed
+  split: {train: 0.8, valid: 0.1, test: 0.1}
+  seed: 42
+  # Ảnh gần giống nhau (vd. khung hình liên tiếp của video) sẽ được gom vào cùng 1 tập
+  # để tránh rò rỉ dữ liệu giữa train/val/test. Đặt -1 để tắt.
+  dedupe_hamming: 4
+
+paths:
+  reports_dir: reports
+
+train:
+  model: yolo11n.pt
+  name: yolo11n_baseline
+  project: runs
+  epochs: 40
+  imgsz: 960
+  batch: 8             
+  workers: 2
+  device: auto          # auto | cpu | 0 | mps
+  patience: 15
+  seed: 42
+  cos_lr: true
+  # Augmentation do Ultralytics xử lý trực tiếp khi train (không cần augment offline)
+  fliplr: 0.0           # TẮT lật ngang: lật sẽ đảo nghĩa biển rẽ trái/phải
+  flipud: 0.0
+  degrees: 5.0
+  translate: 0.1
+  scale: 0.9
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  mosaic: 1.0
+  close_mosaic: 5
+
+infer:
+  conf: 0.35
+  imgsz: 960
+  tracker: bytetrack.yaml

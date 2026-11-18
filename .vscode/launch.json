@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "1. EDA dữ liệu", "type": "debugpy", "request": "launch",
+      "module": "vnsign.data.eda", "console": "integratedTerminal" },
+    { "name": "2. Prepare data", "type": "debugpy", "request": "launch",
+      "module": "vnsign.data.prepare", "console": "integratedTerminal" },
+    { "name": "3. Train", "type": "debugpy", "request": "launch",
+      "module": "vnsign.train.train", "console": "integratedTerminal" },
+    { "name": "3b. Train nhanh (2 epoch, thử pipeline)", "type": "debugpy", "request": "launch",
+      "module": "vnsign.train.train", "args": ["--epochs", "2", "--name", "smoke_test"],
+      "console": "integratedTerminal" },
+    { "name": "4. Evaluate (test set)", "type": "debugpy", "request": "launch",
+      "module": "vnsign.eval.evaluate", "console": "integratedTerminal" },
+    { "name": "5. Export + benchmark", "type": "debugpy", "request": "launch",
+      "module": "vnsign.export.export", "console": "integratedTerminal" },
+    { "name": "6. Predict webcam", "type": "debugpy", "request": "launch",
+      "module": "vnsign.inference.predict", "args": ["--source", "0", "--show"],
+      "console": "integratedTerminal" },
+    { "name": "6b. Predict file (sửa đường dẫn)", "type": "debugpy", "request": "launch",
+      "module": "vnsign.inference.predict", "args": ["--source", "${input:source}"],
+      "console": "integratedTerminal" },
+    { "name": "7. Streamlit demo", "type": "debugpy", "request": "launch",
+      "module": "streamlit", "args": ["run", "app/streamlit_app.py"],
+      "console": "integratedTerminal" }
+  ],
+  "inputs": [
+    { "id": "source", "type": "promptString",
+      "description": "Đường dẫn ảnh / thư mục / video", "default": "sample.mp4" }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Cài đặt project (pip install -e .[dev])", "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["-m", "pip", "install", "-e", ".[dev]"], "problemMatcher": [] },
+    { "label": "Chạy test", "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["-m", "pytest", "-q"], "group": "test", "problemMatcher": [] },
+    { "label": "Lint (ruff)", "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["-m", "ruff", "check", "src", "app", "tests"], "problemMatcher": [] },
+    { "label": "Pipeline: prepare -> train -> eval", "dependsOrder": "sequence",
+      "dependsOn": ["prepare", "train", "evaluate"], "problemMatcher": [] },
+    { "label": "prepare", "type": "shell", "command": "${command:python.interpreterPath}",
+      "args": ["-m", "vnsign.data.prepare"], "problemMatcher": [] },
+    { "label": "train", "type": "shell", "command": "${command:python.interpreterPath}",
+      "args": ["-m", "vnsign.train.train"], "problemMatcher": [] },
+    { "label": "evaluate", "type": "shell", "command": "${command:python.interpreterPath}",
+      "args": ["-m", "vnsign.eval.evaluate"], "problemMatcher": [] }
+  ]
+}

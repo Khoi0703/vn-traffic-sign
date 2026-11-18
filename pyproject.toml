@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vnsign"
+version = "0.1.0"
+description = "Nhận diện biển báo giao thông Việt Nam với YOLO11"
+requires-python = ">=3.10"
+dependencies = [
+  "ultralytics>=8.3.0",
+  "kagglehub",
+  "imagehash",
+  "pillow",
+  "opencv-python",
+  "matplotlib",
+  "pandas",
+  "numpy",
+  "pyyaml",
+  "streamlit",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+vnsign-eda = "vnsign.data.eda:main"
+vnsign-prepare = "vnsign.data.prepare:main"
+vnsign-train = "vnsign.train.train:main"
+vnsign-eval = "vnsign.eval.evaluate:main"
+vnsign-export = "vnsign.export.export:main"
+vnsign-predict = "vnsign.inference.predict:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
