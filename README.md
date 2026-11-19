@@ -10,85 +10,6 @@ Hệ thống phát hiện và phân loại **52 loại biển báo giao thông V
   <img src="docs/assets/sample_predictions.jpg" alt="Kết quả dự đoán mẫu trên tập test" width="90%">
   <br><em>Dự đoán trên ảnh dashcam thuộc tập test (mưa, nhiều xe máy, biển nhỏ ở xa).</em>
 </p>
-
-## ✨ Điểm nhấn
-
-| | |
-| :--- | :--- |
-| 🎯 **Độ chính xác** | **mAP@50 = 0.982**, F1 = 0.94 trên tập test độc lập (320 ảnh, 823 biển) |
-| ⚡ **Tốc độ** | ~139 FPS trên GPU (RTX 3050 Laptop); 17.5 FPS trên CPU với OpenVINO ở 960×960 |
-| 🪶 **Nhẹ** | YOLO11n, 2.6M tham số, file `best.pt` ~5.5 MB |
-| 🧹 **Dữ liệu sạch** | Gom ảnh gần giống nhau (khung hình liên tiếp) bằng **pHash** *trước khi* chia train/val/test để tránh rò rỉ dữ liệu |
-| 🔁 **Tái lập được** | Toàn bộ tham số nằm ở `configs/default.yaml`, mỗi bước là một lệnh CLI, có unit test |
-| 🎬 **Video & Web** | Tracking ByteTrack (mỗi biển chỉ ghi 1 lần) + ứng dụng Streamlit |
-
----
-
-## 📁 Cấu trúc project
-
-```
-vn-traffic-sign/
-├── configs/default.yaml          # Cấu hình trung tâm (data / train / infer)
-├── src/vnsign/
-│   ├── config.py                 # Đọc config, chọn thiết bị (CUDA / MPS / CPU)
-│   ├── data/                     # EDA, lọc nhãn, chia tập chống rò rỉ (pHash)
-│   ├── train/train.py            # Huấn luyện
-│   ├── eval/evaluate.py          # Chỉ số tổng + AP từng lớp + confusion matrix
-│   ├── export/export.py          # Export ONNX / OpenVINO + benchmark CPU
-│   └── inference/predict.py      # Ảnh / thư mục / video / webcam + tracking
-├── app/streamlit_app.py          # Web demo
-├── tests/test_prepare.py         # Unit test cho bước chuẩn bị dữ liệu
-├── notebooks/                    # Notebook Kaggle gốc (tham khảo)
-└── docs/assets/                  # Ảnh dùng trong README
-```
-
----
-
-## 🚀 Bắt đầu nhanh
-
-```bash
-git clone https://github.com/Khoi0703/vn-traffic-sign.git
-cd vn-traffic-sign
-
-python -m venv .venv
-.venv\Scripts\activate            # Windows  (macOS/Linux: source .venv/bin/activate)
-pip install -e ".[dev]"
-pytest -q                         # kiểm tra môi trường
-```
-
-> **Weights:** file `*.pt` không được đưa vào repo. Hãy tự huấn luyện (~45 phút trên RTX 3050 Laptop) theo hướng dẫn bên dưới, hoặc truyền weights của bạn qua `--weights`.
-
-### Chạy toàn bộ pipeline
-
-```bash
-vnsign-eda                                          # 1. Thống kê phân bố dữ liệu thô
-vnsign-prepare                                      # 2. Lọc nhãn lỗi + chia tập chống rò rỉ (pHash)
-vnsign-train --epochs 40 --name yolo11n_baseline    # 3. Huấn luyện
-vnsign-eval --split test                            # 4. Đánh giá → per_class_test.csv + biểu đồ
-vnsign-export --formats onnx openvino               # 5. Export + benchmark.csv
-vnsign-predict --source video.mp4 --conf 0.5        # 6. Suy luận video + tracking
-streamlit run app/streamlit_app.py                  # 7. Web demo
-```
-
-Dữ liệu được tải tự động từ Kaggle qua `kagglehub`. Nếu đã có sẵn, đặt thư mục chứa `images/` và `labels/` vào `data/raw` (hoặc đổi `data.raw_dir` trong config).
-
-### Một số ví dụ sử dụng
-
-```bash
-# Webcam (nhấn q để thoát)
-vnsign-predict --source 0 --conf 0.55 --show
-
-# Thư mục ảnh, dùng weights riêng
-vnsign-predict --weights path/to/best.pt --source ./my_images --out ./out
-
-# Export OpenVINO INT8
-vnsign-export --formats openvino --int8
-```
-
-Với video và webcam, kết quả gồm `annotated.mp4` và `signs_log.csv` (mỗi biển một dòng: track ID, lớp, thời điểm xuất hiện đầu tiên, độ tin cậy cao nhất).
-
----
-
 ## 🗂️ Dữ liệu
 
 - **Nguồn:** [Vietnam Traffic Signs – Kaggle (`maitam/vietnamese-traffic-signs`)](https://www.kaggle.com/datasets/maitam/vietnamese-traffic-signs), định dạng nhãn YOLO, **52 lớp**.
@@ -108,6 +29,143 @@ Vì dữ liệu gồm các khung hình liên tiếp, chia ảnh ngẫu nhiên s�
 2. Gom các ảnh có khoảng cách Hamming ≤ 4 vào cùng một nhóm (`data.dedupe_hamming`).
 3. Chia **theo nhóm**, nên toàn bộ một nhóm luôn nằm chung một tập.
 4. Kiểm tra và loại các dòng nhãn không hợp lệ (sai lớp, toạ độ ngoài [0, 1], thiếu trường), ghi `split_report.json`.
+
+---
+
+## ✨ Điểm nhấn
+
+| | |
+| :--- | :--- |
+| 🎯 **Độ chính xác** | **mAP@50 = 0.982**, F1 = 0.94 trên tập test độc lập (320 ảnh, 823 biển) |
+| ⚡ **Tốc độ** | ~139 FPS trên GPU (RTX 3050 Laptop); 17.5 FPS trên CPU với OpenVINO ở 960×960 |
+| 🪶 **Nhẹ** | YOLO11n, 2.6M tham số, file `best.pt` ~5.5 MB |
+| 🧹 **Dữ liệu sạch** | Gom ảnh gần giống nhau (khung hình liên tiếp) bằng **pHash** *trước khi* chia train/val/test để tránh rò rỉ dữ liệu |
+| 🔁 **Tái lập được** | Toàn bộ tham số nằm ở `configs/default.yaml`, mỗi bước là một lệnh CLI, có unit test |
+| 🎬 **Video & Web** | Tracking ByteTrack (mỗi biển chỉ ghi 1 lần) + ứng dụng Streamlit |
+
+---
+
+## 📁 Setup
+
+Yêu cầu: Python 3.10–3.12 (khuyến nghị 3.12), VS Code.
+
+1. Mở thư mục project trong VS Code (`File > Open Folder`) và cài các extension được gợi ý.
+2. Chọn Python: `Ctrl+Shift+P` > **Python: Select Interpreter** > chọn bản Python bạn sẽ cài thư viện vào.
+   Dùng môi trường ảo (`python -m venv .venv`) là tuỳ chọn; nếu cài thẳng vào Python của máy thì đừng để VS Code chọn nhầm một `.venv` rỗng.
+3. **Nếu có GPU NVIDIA**, cài PyTorch bản CUDA trước (lệnh lấy tại https://pytorch.org/get-started/locally/), ví dụ:
+   ```powershell
+   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+   ```
+   Nếu bỏ qua, pip sẽ cài bản CPU (vẫn chạy được, chậm hơn nhiều).
+4. Cài project:
+   ```powershell
+   python -m pip install -e ".[dev]"
+   ```
+5. Kiểm tra:
+   ```powershell
+   python -m pytest -q
+   python -c "import torch, ultralytics; print('GPU:', torch.cuda.is_available(), ultralytics.__version__)"
+   ```
+   `4 passed` và `GPU: True` là đúng.
+
+Nếu PowerShell chặn kích hoạt môi trường ảo ("running scripts is disabled"): `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+## Cách chạy
+
+Mở **Run and Debug** (`Ctrl+Shift+D`), chọn cấu hình rồi bấm F5, theo thứ tự:
+
+| Bước | Cấu hình | Việc làm |
+|---|---|---|
+| 1 | EDA dữ liệu | Tự tải dataset từ Kaggle, vẽ biểu đồ vào `reports/eda/` |
+| 2 | Prepare data | Kiểm tra nhãn, gom nhóm, chia tập vào `data/processed/` |
+| 3b | Train nhanh (2 epoch) | Chạy thử pipeline trước khi train thật |
+| 3 | Train | Huấn luyện theo `configs/default.yaml` |
+| 4 | Evaluate (test set) | mAP, `reports/per_class_test.csv`, confusion matrix |
+| 5 | Export + benchmark | ONNX / OpenVINO + FPS trên CPU |
+| 6 | Predict webcam / file | Nhận diện + tracking, xuất `signs_log.csv` |
+| 7 | Streamlit demo | Giao diện web |
+
+Hoặc dùng terminal:
+
+```powershell
+python -m vnsign.data.eda
+python -m vnsign.data.prepare                 # thêm --raw <thư mục> nếu đã có sẵn dữ liệu
+python -m vnsign.train.train --name run_moi   # luôn đặt tên riêng cho mỗi lần train
+python -m vnsign.eval.evaluate --weights models\best.pt
+python -m vnsign.export.export
+python -m vnsign.inference.predict --source 0 --show           # webcam, nhấn q để thoát
+python -m vnsign.inference.predict --source video.mp4 --show   # video có sẵn
+streamlit run app/streamlit_app.py
+```
+
+Dữ liệu tự tải từ Kaggle ở lần chạy đầu. Nếu đã có sẵn, đặt thư mục chứa `images/` và `labels/` vào `data/raw/`.
+
+### Webcam
+
+Nếu cửa sổ đen hoặc không mở được, đổi `--source 0` thành `--source 1` (camera ảo như OBS/Zoom có thể chiếm số 0) và tắt các ứng dụng đang dùng camera.
+Mô hình được train trên biển nhỏ trong ảnh dashcam, nên với webcam hãy đặt biển (in ra hoặc trên điện thoại) cách camera khoảng 0.5–1 m, hoặc phát video dashcam trên màn hình khác.
+
+## Cấu hình
+
+Mọi tham số nằm trong `configs/default.yaml`. Các giá trị chính:
+
+| Tham số | Giá trị | Ghi chú |
+|---|---|---|
+| `train.imgsz` | 960 | 640 nhanh hơn ~2 lần nhưng bắt biển nhỏ kém hơn |
+| `train.epochs` | 40 | có dừng sớm (`patience: 15`) |
+| `train.batch` | 8 | phù hợp GPU 4GB |
+| `train.fliplr` | 0.0 | **không** lật ngang vì biển rẽ trái/phải sẽ đảo nghĩa |
+| `train.scale` | 0.9 | giúp mô hình quen cả biển ở cự ly gần |
+| `infer.conf` | 0.55 | đường F1 đạt đỉnh ở ngưỡng ~0.59 |
+| `data.dedupe_hamming` | 4 | ngưỡng gom ảnh giống nhau; `-1` để tắt |
+
+Gợi ý theo phần cứng:
+
+| Máy | Gợi ý |
+|---|---|
+| Không GPU | `batch: 4`, `epochs` 30; hoặc train trên Kaggle/Colab rồi chép `best.pt` về |
+| GPU 4GB | `batch: 8` (ở 960px) |
+| GPU 6GB | `batch: 16` |
+| GPU ≥ 8GB | `batch: 32`, thử `yolo11s.pt` |
+| Mac Apple Silicon | `device: auto` sẽ dùng `mps` |
+
+## Quản lý tệp
+
+Mỗi lần train ghi vào `runs/<name>/`. Nếu trùng `name`, kết quả cũ **bị ghi đè**. Vì vậy:
+
+- Luôn truyền `--name` riêng, ví dụ `python -m vnsign.train.train --name yolo11s_960 --model yolo11s.pt`.
+- Sau khi có mô hình tốt, chép ra thư mục an toàn:
+  ```powershell
+  copy runs\<name>\weights\best.pt models\ten_mo_hinh.pt
+  ```
+- Chỉ đổi một tham số mỗi lần nếu muốn biết tham số đó đóng góp bao nhiêu.
+- `evaluate` dùng `train.imgsz` trong cấu hình; hãy đánh giá cùng kích thước ảnh với lúc train.
+
+## Cấu trúc
+
+```
+configs/default.yaml      Toàn bộ tham số (dữ liệu, train, suy luận)
+src/vnsign/data/          source (tải), prepare (chia tập), eda
+src/vnsign/train/         train.py
+src/vnsign/eval/          evaluate.py (AP từng lớp)
+src/vnsign/export/        export.py (ONNX/OpenVINO + benchmark)
+src/vnsign/inference/     predict.py (ảnh/video/webcam + ByteTrack)
+app/streamlit_app.py      Demo web
+tests/                    pytest
+models/                   Nơi lưu trọng số tốt nhất (bị .gitignore)
+notebooks/                Notebook gốc
+.vscode/                  settings, launch, tasks
+data/ runs/ reports/      Sinh ra khi chạy (bị .gitignore)
+```
+
+## Quy trình dữ liệu
+
+1. Kiểm tra nhãn: dòng nhãn sai định dạng hoặc ngoài khoảng hợp lệ bị loại, ảnh không có nhãn được coi là ảnh nền.
+2. Tính perceptual hash (pHash) cho từng ảnh, gom các ảnh có khoảng cách Hamming không quá `dedupe_hamming` thành một nhóm.
+3. Chia theo nhóm (không chia theo ảnh) thành train/valid/test xấp xỉ 80/10/10, để các khung hình gần giống nhau không rơi vào hai tập khác nhau.
+4. Ghi `data/processed/` kèm `dataset.yaml` và `split_report.json`. Ảnh không bị resize hay augment offline.
+
+Với dữ liệu hiện tại: 3.216 ảnh thành 2.346 nhóm (nhóm lớn nhất 22 ảnh); 2.572 / 324 / 320 ảnh cho train / valid / test; 2 lớp vắng trong valid và 6 lớp vắng trong test vì quá hiếm.
 
 ---
 
